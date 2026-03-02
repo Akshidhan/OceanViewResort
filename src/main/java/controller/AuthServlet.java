@@ -48,7 +48,7 @@ public class AuthServlet extends HttpServlet {
         if ("/me".equals(path)) {
             handleMe(req, resp);
         } else {
-            resp.sendError(HttpServletResponse.SC_NOT_FOUND);
+            JsonUtil.notFound(resp, "Unknown auth route");
         }
     }
 

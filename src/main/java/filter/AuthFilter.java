@@ -15,6 +15,7 @@ public class AuthFilter implements Filter {
 
     private static final Set<String> PUBLIC = Set.of(
             "/api/health",
+            "/api/health/reservations-test",
             "/api/auth/login"
     );
 

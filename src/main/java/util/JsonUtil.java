@@ -1,6 +1,7 @@
 package util;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import jakarta.json.bind.Jsonb;
 import jakarta.json.bind.JsonbBuilder;
 import jakarta.servlet.http.HttpServletResponse;
@@ -12,7 +13,8 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 public final class JsonUtil {
-    private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final ObjectMapper MAPPER = new ObjectMapper()
+            .disable(SerializationFeature.FAIL_ON_EMPTY_BEANS);
     private static final Jsonb JSONB = JsonbBuilder.create();
 
     private JsonUtil() {}
@@ -31,10 +33,22 @@ public final class JsonUtil {
     }
 
     public static void writeJson(HttpServletResponse resp, int status, Object body) throws IOException {
+        String json;
+        try {
+            json = MAPPER.writeValueAsString(body);
+        } catch (Exception e) {
+            System.err.println("[JsonUtil] Serialization failed: " + e.getMessage());
+            e.printStackTrace();
+            json = "{\"error\":\"server_error\",\"message\":\"Response serialization failed\"}";
+            status = HttpServletResponse.SC_INTERNAL_SERVER_ERROR;
+        }
+        byte[] bytes = json.getBytes(StandardCharsets.UTF_8);
         resp.setStatus(status);
-        resp.setCharacterEncoding("UTF-8");
         resp.setContentType("application/json");
-        MAPPER.writeValue(resp.getWriter(), body);
+        resp.setCharacterEncoding("UTF-8");
+        resp.setContentLength(bytes.length);
+        resp.getOutputStream().write(bytes);
+        resp.getOutputStream().flush();
     }
 
     public static void ok(HttpServletResponse resp, Object body) throws IOException {
