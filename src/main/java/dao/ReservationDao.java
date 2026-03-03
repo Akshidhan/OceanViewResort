@@ -11,7 +11,7 @@ public class ReservationDao {
 
     // ── CREATE ────────────────────────────────────────────────────────────────
     public ReservationModel create(ReservationModel r) {
-        String sql = "INSERT INTO reservations (guest_name, address, contact_number, room_type, check_in, check_out) " +
+        String sql = "INSERT INTO reservations (guest_name, address, contact_number, room_id, check_in, check_out) " +
                      "VALUES (?, ?, ?, ?, ?, ?)";
         try (Connection con = Db.getConnection();
              PreparedStatement ps = con.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
@@ -19,7 +19,7 @@ public class ReservationDao {
             ps.setString(1, r.getGuestName());
             ps.setString(2, r.getAddress());
             ps.setString(3, r.getContactNumber());
-            ps.setString(4, r.getRoomType());
+            ps.setLong(4, r.getRoomId());
             ps.setDate(5, Date.valueOf(r.getCheckIn()));
             ps.setDate(6, Date.valueOf(r.getCheckOut()));
             ps.executeUpdate();
@@ -27,7 +27,8 @@ public class ReservationDao {
             try (ResultSet keys = ps.getGeneratedKeys()) {
                 if (keys.next()) r.setId(keys.getLong(1));
             }
-            return r;
+            // Re-fetch to populate room name and price
+            return findById(r.getId());
         } catch (SQLException e) {
             throw new RuntimeException("DB error in createReservation", e);
         }
@@ -35,7 +36,10 @@ public class ReservationDao {
 
     // ── READ ONE ──────────────────────────────────────────────────────────────
     public ReservationModel findById(long id) {
-        String sql = "SELECT * FROM reservations WHERE id = ?";
+        String sql = "SELECT r.*, rm.name AS room_name, rm.price_per_night " +
+                     "FROM reservations r " +
+                     "JOIN rooms rm ON rm.id = r.room_id " +
+                     "WHERE r.id = ?";
         try (Connection con = Db.getConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
 
@@ -52,14 +56,14 @@ public class ReservationDao {
     // ── UPDATE ────────────────────────────────────────────────────────────────
     public boolean update(ReservationModel r) {
         String sql = "UPDATE reservations SET guest_name=?, address=?, contact_number=?, " +
-                     "room_type=?, check_in=?, check_out=? WHERE id=?";
+                     "room_id=?, check_in=?, check_out=? WHERE id=?";
         try (Connection con = Db.getConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
 
             ps.setString(1, r.getGuestName());
             ps.setString(2, r.getAddress());
             ps.setString(3, r.getContactNumber());
-            ps.setString(4, r.getRoomType());
+            ps.setLong(4, r.getRoomId());
             ps.setDate(5, Date.valueOf(r.getCheckIn()));
             ps.setDate(6, Date.valueOf(r.getCheckOut()));
             ps.setLong(7, r.getId());
@@ -85,18 +89,21 @@ public class ReservationDao {
     // ── LIST (filtered + paginated) ────────────────────────────────────────────
     /**
      * @param search     free-text search across guest_name, address, contact_number (nullable)
-     * @param roomType   exact room type filter (nullable)
-     * @param dateFrom   check-in >= dateFrom (nullable)
-     * @param dateTo     check-in <= dateTo   (nullable)
+     * @param roomId     exact room id filter (nullable)
+     * @param dateFrom   check_in >= dateFrom (nullable)
+     * @param dateTo     check_in <= dateTo   (nullable)
      * @param page       1-based page number
      * @param pageSize   number of records per page
      */
-    public List<ReservationModel> findAll(String search, String roomType,
+    public List<ReservationModel> findAll(String search, Long roomId,
                                           String dateFrom, String dateTo,
                                           int page, int pageSize) {
-        QueryParts qp = buildWhere(search, roomType, dateFrom, dateTo);
-        String sql = "SELECT * FROM reservations" + qp.where +
-                     " ORDER BY check_in DESC LIMIT ? OFFSET ?";
+        QueryParts qp = buildWhere(search, roomId, dateFrom, dateTo);
+        String sql = "SELECT r.*, rm.name AS room_name, rm.price_per_night " +
+                     "FROM reservations r " +
+                     "JOIN rooms rm ON rm.id = r.room_id" +
+                     qp.where +
+                     " ORDER BY r.check_in DESC LIMIT ? OFFSET ?";
 
         try (Connection con = Db.getConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
@@ -115,9 +122,11 @@ public class ReservationDao {
         }
     }
 
-    public long count(String search, String roomType, String dateFrom, String dateTo) {
-        QueryParts qp = buildWhere(search, roomType, dateFrom, dateTo);
-        String sql = "SELECT COUNT(*) FROM reservations" + qp.where;
+    public long count(String search, Long roomId, String dateFrom, String dateTo) {
+        QueryParts qp = buildWhere(search, roomId, dateFrom, dateTo);
+        String sql = "SELECT COUNT(*) FROM reservations r " +
+                     "JOIN rooms rm ON rm.id = r.room_id" +
+                     qp.where;
 
         try (Connection con = Db.getConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
@@ -139,33 +148,35 @@ public class ReservationDao {
                 rs.getString("guest_name"),
                 rs.getString("address"),
                 rs.getString("contact_number"),
-                rs.getString("room_type"),
+                rs.getLong("room_id"),
+                rs.getString("room_name"),
+                rs.getDouble("price_per_night"),
                 rs.getDate("check_in").toLocalDate().toString(),
                 rs.getDate("check_out").toLocalDate().toString()
         );
     }
 
     /** Builds the WHERE clause and captures how to bind parameters. */
-    private static QueryParts buildWhere(String search, String roomType,
+    private static QueryParts buildWhere(String search, Long roomId,
                                          String dateFrom, String dateTo) {
         StringBuilder sb = new StringBuilder();
         List<Object> params = new ArrayList<>();
 
         if (search != null && !search.isBlank()) {
             String like = "%" + search.trim() + "%";
-            sb.append(" AND (guest_name LIKE ? OR address LIKE ? OR contact_number LIKE ?)");
+            sb.append(" AND (r.guest_name LIKE ? OR r.address LIKE ? OR r.contact_number LIKE ?)");
             params.add(like); params.add(like); params.add(like);
         }
-        if (roomType != null && !roomType.isBlank()) {
-            sb.append(" AND room_type = ?");
-            params.add(roomType.trim());
+        if (roomId != null) {
+            sb.append(" AND r.room_id = ?");
+            params.add(roomId);
         }
         if (dateFrom != null && !dateFrom.isBlank()) {
-            sb.append(" AND check_in >= ?");
+            sb.append(" AND r.check_in >= ?");
             params.add(Date.valueOf(dateFrom.trim()));
         }
         if (dateTo != null && !dateTo.isBlank()) {
-            sb.append(" AND check_in <= ?");
+            sb.append(" AND r.check_in <= ?");
             params.add(Date.valueOf(dateTo.trim()));
         }
 
@@ -187,6 +198,7 @@ public class ReservationDao {
             for (Object p : params) {
                 if (p instanceof String)    ps.setString(i, (String) p);
                 else if (p instanceof Date) ps.setDate(i, (Date) p);
+                else if (p instanceof Long) ps.setLong(i, (Long) p);
                 i++;
             }
             return i;

@@ -1,6 +1,7 @@
 package controller;
 
 import dao.ReservationDao;
+import dao.RoomDao;
 import dto.ReservationPageDto;
 import dto.ReservationRequestDto;
 import jakarta.servlet.annotation.WebServlet;
@@ -27,7 +28,7 @@ import java.util.Collections;
  *   page      (int,  default 1)
  *   pageSize  (int,  default 10, max 100)
  *   search    (string, searches guest_name / address / contact_number)
- *   roomType  (string, exact match)
+ *   roomId    (long,   exact match on room id)
  *   dateFrom  (yyyy-MM-dd, check_in >= dateFrom)
  *   dateTo    (yyyy-MM-dd, check_in <= dateTo)
  */
@@ -38,7 +39,7 @@ public class ReservationServlet extends HttpServlet {
 
     @Override
     public void init() {
-        this.service = new ReservationService(new ReservationDao());
+        this.service = new ReservationService(new ReservationDao(), new RoomDao());
     }
 
     // ── POST /api/reservations ──────────────────────────────────────────────
@@ -69,13 +70,13 @@ public class ReservationServlet extends HttpServlet {
             // List all with filters + pagination
             try {
                 String search   = req.getParameter("search");
-                String roomType = req.getParameter("roomType");
+                Long roomId     = parseLongParam(req.getParameter("roomId"));
                 String dateFrom = req.getParameter("dateFrom");
                 String dateTo   = req.getParameter("dateTo");
                 int page     = parseIntParam(req.getParameter("page"),     1);
                 int pageSize = parseIntParam(req.getParameter("pageSize"), 10);
 
-                ReservationPageDto result = service.getAll(search, roomType, dateFrom, dateTo, page, pageSize);
+                ReservationPageDto result = service.getAll(search, roomId, dateFrom, dateTo, page, pageSize);
                 JsonUtil.ok(resp, result);
             } catch (IllegalArgumentException e) {
                 JsonUtil.badRequest(resp, e.getMessage());
@@ -155,6 +156,12 @@ public class ReservationServlet extends HttpServlet {
         if (value == null || value.isBlank()) return defaultValue;
         try { return Integer.parseInt(value.trim()); }
         catch (NumberFormatException e) { return defaultValue; }
+    }
+
+    private Long parseLongParam(String value) {
+        if (value == null || value.isBlank()) return null;
+        try { return Long.parseLong(value.trim()); }
+        catch (NumberFormatException e) { return null; }
     }
 }
 
