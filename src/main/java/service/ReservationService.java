@@ -1,7 +1,7 @@
 package service;
 
-import dao.ReservationDao;
-import dao.RoomDao;
+import dao.IReservationDao;
+import dao.IRoomDao;
 import dto.ReservationPageDto;
 import dto.ReservationRequestDto;
 import model.ReservationModel;
@@ -12,10 +12,10 @@ import java.util.List;
 
 public class ReservationService {
 
-    private final ReservationDao dao;
-    private final RoomDao roomDao;
+    private final IReservationDao dao;
+    private final IRoomDao roomDao;
 
-    public ReservationService(ReservationDao dao, RoomDao roomDao) {
+    public ReservationService(IReservationDao dao, IRoomDao roomDao) {
         this.dao = dao;
         this.roomDao = roomDao;
     }

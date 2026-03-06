@@ -1,7 +1,7 @@
 package service;
 
-import dao.BillDao;
-import dao.ReservationDao;
+import dao.IBillDao;
+import dao.IReservationDao;
 import dto.BillPageDto;
 import dto.BillRequestDto;
 import model.BillModel;
@@ -13,10 +13,10 @@ import java.util.List;
 
 public class BillService {
 
-    private final BillDao billDao;
-    private final ReservationDao reservationDao;
+    private final IBillDao billDao;
+    private final IReservationDao reservationDao;
 
-    public BillService(BillDao billDao, ReservationDao reservationDao) {
+    public BillService(IBillDao billDao, IReservationDao reservationDao) {
         this.billDao = billDao;
         this.reservationDao = reservationDao;
     }

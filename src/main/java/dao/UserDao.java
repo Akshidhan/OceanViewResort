@@ -7,7 +7,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 
-public class UserDao {
+public class UserDao implements IUserDao {
     public userModel findByUsername(String username) {
         String sql = "SELECT id, username, password_hash FROM users WHERE username = ?";
         try (Connection con = Db.getConnection();

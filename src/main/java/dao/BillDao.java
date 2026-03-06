@@ -7,7 +7,7 @@ import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
-public class BillDao {
+public class BillDao implements IBillDao {
 
     // ── CREATE ────────────────────────────────────────────────────────────────
     public BillModel create(BillModel b) {

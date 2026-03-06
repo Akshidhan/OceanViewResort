@@ -1,15 +1,15 @@
 package service;
 
-import dao.UserDao;
+import dao.IUserDao;
 import exception.AuthException;
 import model.userModel;
 import util.PasswordUtil;
 
 public class AuthService {
 
-    private final UserDao userDao;
+    private final IUserDao userDao;
 
-    public AuthService(UserDao userDao) {
+    public AuthService(IUserDao userDao) {
         this.userDao = userDao;
     }
 

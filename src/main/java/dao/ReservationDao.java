@@ -7,7 +7,7 @@ import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
-public class ReservationDao {
+public class ReservationDao implements IReservationDao {
 
     // ── CREATE ────────────────────────────────────────────────────────────────
     public ReservationModel create(ReservationModel r) {
